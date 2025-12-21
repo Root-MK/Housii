@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function: Check if user is admin approved
+    function isAdminApproved() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin_accepted == true;
+    }
+    
+    // Helper function: Check if user is home member
+    function isHomeMember(homeId) {
+      return isAdminApproved() && 
+        request.auth.uid in get(/databases/$(database)/documents/homes/$(homeId)).data.memberIds;
+    }
+    
+    // Helper function: Check if user is home owner
+    function isHomeOwner(homeId) {
+      return isAdminApproved() && 
+        request.auth.uid == get(/databases/$(database)/documents/homes/$(homeId)).data.ownerId;
+    }
+    
+    // ============================================
+    // ANTI-SPAM: Registration protection
+    // ============================================
+    
+    // Blocked signups - track failed registration attempts
+    match /blocked_signups/{email} {
+      // Allow read to check if blocked (needed before auth)
+      allow read: if true;
+      
+      // Allow write only if:
+      // 1. Creating/updating with valid structure
+      // 2. Limit write rate by requiring recent auth or specific conditions
+      allow write: if request.resource.data.keys().hasAll(['email', 'failedAttempts'])
+        && request.resource.data.failedAttempts is int
+        && request.resource.data.failedAttempts <= 10; // Prevent abuse
+    }
+    
+    // Global signup rate limiting (by day)
+    match /signup_rate_limits/{dateKey} {
+      // No client access - managed by Cloud Functions
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // END ANTI-SPAM
+    // ============================================
+    
+    // ============================================
+    // APP CONFIG: Global settings (managed from Firebase Console)
+    // ============================================
+    
+    // App configuration - registration toggle etc.
+    match /app_config/{configId} {
+      // Anyone can read (needed to check if registration is open)
+      allow read: if true;
+      
+      // No client writes - managed from Firebase Console only
+      allow write: if false;
+    }
+    
+    // ============================================
+    // END APP CONFIG
+    // ============================================
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read and write their own document
+      // But cannot change admin_accepted field
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow create always for own document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow update but protect admin_accepted
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['admin_accepted'])
+            || resource.data.admin_accepted == request.resource.data.admin_accepted);
+      
+      // No delete
+      allow delete: if false;
+    }
+    
+    // Homes collection
+    match /homes/{homeId} {
+      // Members can read home
+      // OR admin-approved users can query by joinCode (for joining)
+      allow read: if isHomeMember(homeId) || isAdminApproved();
+      
+      // Approved users can create homes
+      allow create: if isAdminApproved();
+      
+      // Members can update home (for joining)
+      allow update: if isAdminApproved() && (
+        isHomeMember(homeId) ||
+        // Allow users to add themselves to memberIds (joining)
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'updatedAt'])
+      );
+      
+      // Only owner can delete home
+      allow delete: if isHomeOwner(homeId);
+      
+      // Shopping subcollection
+      match /shopping/{itemId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Stores subcollection
+      match /stores/{storeId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Item suggestions subcollection
+      match /item_suggestions/{suggestionId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Lists subcollection
+      match /lists/{listId} {
+        // All home members can read lists
+        // Personal list filtering is done client-side
+        allow read: if isHomeMember(homeId);
+        
+        // All home members can create lists
+        // For updates/deletes: household lists can be edited by anyone,
+        // personal lists only by creator
+        allow create: if isHomeMember(homeId);
+        allow update, delete: if isHomeMember(homeId) && (
+          resource.data.visibility == 'household' ||
+          resource.data.createdBy == request.auth.uid
+        );
+      }
+      
+      // List items subcollection
+      match /listItems/{itemId} {
+        // Members can read/write items for lists they have access to
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Household subcollection (legacy)
+      match /household/{taskId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Food subcollection (legacy)
+      match /food/{mealId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Meal plans subcollection
+      match /mealPlans/{planId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Food ideas subcollection
+      match /foodIdeas/{ideaId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Freezer items subcollection
+      match /freezerItems/{itemId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Garden subcollection
+      match /garden/{plantId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+    }
+    
+    // User-specific list ordering
+    match /users/{userId}/listOrders/{orderId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
