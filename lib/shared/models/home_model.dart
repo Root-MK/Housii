@@ -7,6 +7,7 @@ class HomeModel {
   final String joinCode;
   final String ownerId;
   final List<String> memberIds;
+  final Map<String, dynamic> gardenSettings;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -16,6 +17,7 @@ class HomeModel {
     required this.joinCode,
     required this.ownerId,
     required this.memberIds,
+    this.gardenSettings = const {},
     required this.createdAt,
     required this.updatedAt,
   });
@@ -28,6 +30,7 @@ class HomeModel {
       joinCode: data['joinCode'] ?? '',
       ownerId: data['ownerId'] ?? '',
       memberIds: List<String>.from(data['memberIds'] ?? []),
+      gardenSettings: Map<String, dynamic>.from(data['gardenSettings'] ?? {}),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -39,6 +42,7 @@ class HomeModel {
       'joinCode': joinCode,
       'ownerId': ownerId,
       'memberIds': memberIds,
+      'gardenSettings': gardenSettings,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -60,6 +64,7 @@ class HomeModel {
     String? joinCode,
     String? ownerId,
     List<String>? memberIds,
+    Map<String, dynamic>? gardenSettings,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -69,6 +74,7 @@ class HomeModel {
       joinCode: joinCode ?? this.joinCode,
       ownerId: ownerId ?? this.ownerId,
       memberIds: memberIds ?? this.memberIds,
+      gardenSettings: gardenSettings ?? this.gardenSettings,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

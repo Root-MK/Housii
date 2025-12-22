@@ -6,6 +6,7 @@ import '../../data/models/garden_crop_model.dart';
 import '../providers/garden_providers.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
+import 'bed_form_sheet.dart';
 
 class BedDetailsSheet extends ConsumerStatefulWidget {
   final GardenBed bed;
@@ -38,9 +39,28 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  widget.bed.name,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.bed.name,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      tooltip: 'Rediger bed detaljer',
+                      onPressed: () {
+                        Navigator.pop(context); // Close details
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (context) => BedFormSheet(bed: widget.bed),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -101,16 +121,32 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
   void _confirmDelete(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Slet bed?'),
         content: Text('Er du sikker på, at du vil slette "${widget.bed.name}"? Dette kan ikke fortrydes.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuller')),
           TextButton(
-            onPressed: () {
-              ref.read(gardenControllerProvider.notifier).deleteBed(widget.bed.homeId, widget.bed.id);
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close sheet
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuller'),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Capture navigator and context before any async work
+              final navigator = Navigator.of(context);
+              
+              // Close dialog
+              Navigator.pop(dialogContext);
+              
+              // Perform deletion
+              await ref.read(gardenControllerProvider.notifier).deleteBed(
+                widget.bed.homeId,
+                widget.bed.id,
+              );
+              
+              // Close sheet if we're still mounted
+              if (context.mounted) {
+                navigator.pop();
+              }
             },
             child: const Text('Slet', style: TextStyle(color: Colors.red)),
           ),
@@ -124,12 +160,12 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
       context: context,
       isScrollControlled: true,
       builder: (context) => _EditCropSheet(
-        onSave: (name, variety, notes) {
+        onSave: (name, variety, notes, plantDate) {
           final crop = GardenCrop.create(
             name: name,
             variety: variety,
             notes: notes,
-            plantDate: DateTime.now(),
+            plantDate: plantDate,
           );
           ref.read(gardenControllerProvider.notifier).addCrop(widget.bed, crop);
         },
@@ -143,11 +179,12 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
       isScrollControlled: true,
       builder: (context) => _EditCropSheet(
         crop: crop,
-        onSave: (name, variety, notes) {
+        onSave: (name, variety, notes, plantDate) {
           final updated = crop.copyWith(
             name: name,
             variety: variety,
             notes: notes,
+            plantDate: plantDate,
           );
           ref.read(gardenControllerProvider.notifier).updateCrop(widget.bed, updated);
         },
@@ -155,17 +192,58 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
     );
   }
 
-  void _handleCropAction(GardenCrop crop, String action) {
+  Future<void> _handleCropAction(GardenCrop crop, String action) async {
+    final title = action == 'water' ? 'Registrer vanding' : 'Registrer gødning';
     final now = DateTime.now();
-    GardenCrop updated;
-    if (action == 'water') {
-      updated = crop.copyWith(lastWatered: now);
-    } else if (action == 'fertilize') {
-      updated = crop.copyWith(lastFertilized: now);
-    } else {
-      return;
+    DateTime selectedDate = now;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Hvornår blev dette udført?'),
+              const SizedBox(height: 16),
+              ListTile(
+                title: Text(_dateFormat.format(selectedDate)),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: now,
+                    locale: const Locale('da', 'DK'),
+                  );
+                  if (picked != null) {
+                    setDialogState(() {
+                      selectedDate = picked;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuller')),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Bekræft')),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      GardenCrop updated;
+      if (action == 'water') {
+        updated = crop.copyWith(lastWatered: selectedDate);
+      } else {
+        updated = crop.copyWith(lastFertilized: selectedDate);
+      }
+      ref.read(gardenControllerProvider.notifier).updateCrop(widget.bed, updated);
     }
-    ref.read(gardenControllerProvider.notifier).updateCrop(widget.bed, updated);
   }
 }
 
@@ -266,7 +344,7 @@ class _InfoRow extends StatelessWidget {
 
 class _EditCropSheet extends StatefulWidget {
   final GardenCrop? crop;
-  final Function(String name, String variety, String notes) onSave;
+  final Function(String name, String variety, String notes, DateTime plantDate) onSave;
 
   const _EditCropSheet({this.crop, required this.onSave});
 
@@ -278,6 +356,8 @@ class _EditCropSheetState extends State<_EditCropSheet> {
   late TextEditingController _nameController;
   late TextEditingController _varietyController;
   late TextEditingController _notesController;
+  late DateTime _plantDate;
+  final _dateFormat = DateFormat('d. MMMM yyyy', 'da_DK');
 
   @override
   void initState() {
@@ -285,6 +365,7 @@ class _EditCropSheetState extends State<_EditCropSheet> {
     _nameController = TextEditingController(text: widget.crop?.name);
     _varietyController = TextEditingController(text: widget.crop?.variety);
     _notesController = TextEditingController(text: widget.crop?.notes);
+    _plantDate = widget.crop?.plantDate ?? DateTime.now();
   }
 
   @override
@@ -293,6 +374,21 @@ class _EditCropSheetState extends State<_EditCropSheet> {
     _varietyController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _plantDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('da', 'DK'),
+    );
+    if (picked != null) {
+      setState(() {
+        _plantDate = picked;
+      });
+    }
   }
 
   @override
@@ -325,6 +421,17 @@ class _EditCropSheetState extends State<_EditCropSheet> {
             decoration: const InputDecoration(labelText: 'Sort (f.eks. Nantes 2)', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 16),
+          ListTile(
+            title: const Text('Plantet dato'),
+            subtitle: Text(_dateFormat.format(_plantDate)),
+            trailing: const Icon(Icons.calendar_today),
+            onTap: _selectDate,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 16),
           TextField(
             controller: _notesController,
             decoration: const InputDecoration(labelText: 'Noter', border: OutlineInputBorder()),
@@ -334,7 +441,7 @@ class _EditCropSheetState extends State<_EditCropSheet> {
           ElevatedButton(
             onPressed: () {
               if (_nameController.text.isNotEmpty) {
-                widget.onSave(_nameController.text, _varietyController.text, _notesController.text);
+                widget.onSave(_nameController.text, _varietyController.text, _notesController.text, _plantDate);
                 Navigator.pop(context);
               }
             },

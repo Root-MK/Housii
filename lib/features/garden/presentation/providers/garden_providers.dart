@@ -20,6 +20,7 @@ class GardenController extends _$GardenController {
     double y = 0,
     double width = 100,
     double height = 100,
+    int? color,
   }) async {
     final service = ref.read(gardenServiceProvider);
     final bed = GardenBed.create(
@@ -29,21 +30,19 @@ class GardenController extends _$GardenController {
       y: y,
       width: width,
       height: height,
+      color: color,
     );
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => service.addBed(bed));
+    await service.addBed(bed);
   }
 
   Future<void> updateBed(GardenBed bed) async {
     final service = ref.read(gardenServiceProvider);
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => service.updateBed(bed));
+    await service.updateBed(bed);
   }
 
   Future<void> deleteBed(String homeId, String bedId) async {
     final service = ref.read(gardenServiceProvider);
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => service.deleteBed(homeId, bedId));
+    await service.deleteBed(homeId, bedId);
   }
   
   Future<void> addCrop(GardenBed bed, GardenCrop crop) async {

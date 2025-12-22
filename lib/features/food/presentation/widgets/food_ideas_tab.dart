@@ -16,9 +16,22 @@ class FoodIdeasTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filteredIdeas = ref.watch(filteredFoodIdeasProvider);
     final searchQuery = ref.watch(foodSearchQueryProvider);
+    final allIdeasAsync = ref.watch(foodIdeasProvider);
+    final totalCount = allIdeasAsync.valueOrNull?.length ?? 0;
 
     return Column(
       children: [
+        // Total count
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+          child: Text(
+            'Du har $totalCount madidéer',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.gray,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
         // Search bar
         Padding(
           padding: const EdgeInsets.all(AppSpacing.md),

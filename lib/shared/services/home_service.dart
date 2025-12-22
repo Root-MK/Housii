@@ -107,6 +107,14 @@ class HomeService {
     return HomeModel.fromFirestore(doc);
   }
 
+  /// Update home data
+  Future<void> updateHome(HomeModel home) async {
+    await _firestore.collection('homes').doc(home.id).update({
+      ...home.toFirestore(),
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
   /// Stream of home changes
   Stream<HomeModel?> homeStream(String homeId) {
     return _firestore

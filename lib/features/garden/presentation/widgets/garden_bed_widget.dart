@@ -26,9 +26,53 @@ class _GardenBedWidgetState extends ConsumerState<GardenBedWidget> {
   double? _dragWidth;
   double? _dragHeight;
 
+  // Limits
+  static const double _minSize = 20.0;
+  static const double _maxSize = 1000.0;
+
   // Snap to grid (10cm)
   double _snap(double value) {
     return (value / 10).round() * 10.0;
+  }
+
+  void _initDrag() {
+    setState(() {
+      _dragX = widget.bed.x;
+      _dragY = widget.bed.y;
+      _dragWidth = widget.bed.width;
+      _dragHeight = widget.bed.height;
+    });
+  }
+
+  void _endDrag() {
+    final newX = _snap(_dragX!);
+    final newY = _snap(_dragY!);
+    final newW = _snap(_dragWidth!);
+    final newH = _snap(_dragHeight!);
+
+    setState(() {
+      _dragX = null;
+      _dragY = null;
+      _dragWidth = null;
+      _dragHeight = null;
+    });
+
+    if (newX != widget.bed.x || newY != widget.bed.y || 
+        newW != widget.bed.width || newH != widget.bed.height) {
+      ref.read(gardenControllerProvider.notifier).updateBed(
+        widget.bed.copyWith(
+          x: newX,
+          y: newY,
+          width: newW,
+          height: newH,
+        )
+      );
+    }
+  }
+
+  // Contrast calculator
+  Color _getContrastColor(Color color) {
+    return color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
   }
 
   @override
@@ -38,12 +82,11 @@ class _GardenBedWidgetState extends ConsumerState<GardenBedWidget> {
     final displayY = _dragY ?? bed.y;
     final displayWidth = _dragWidth ?? bed.width;
     final displayHeight = _dragHeight ?? bed.height;
-
-    // We offset the position to center the "workspace" if needed, 
-    // but here we assume absolute positioning on the 5000x5000 canvas.
-    // We might need to add an offset if we want (0,0) to be in the center,
-    // but let's stick to positive coordinates for now.
     
+    final bedColor = bed.color != null ? Color(bed.color!) : AppColors.primaryPurple;
+    final textColor = _getContrastColor(bedColor);
+    final borderColor = widget.isEditMode ? Colors.yellow : Colors.white.withOpacity(0.5);
+
     return Positioned(
       left: displayX,
       top: displayY,
@@ -52,48 +95,28 @@ class _GardenBedWidgetState extends ConsumerState<GardenBedWidget> {
       child: GestureDetector(
         onTap: () {
           if (!widget.isEditMode) {
-            // Open Details
             _showDetails(context);
           }
         },
-        onPanStart: widget.isEditMode ? (details) {
-          setState(() {
-            _dragX = bed.x;
-            _dragY = bed.y;
-          });
-        } : null,
+        onPanStart: widget.isEditMode ? (details) => _initDrag() : null,
         onPanUpdate: widget.isEditMode ? (details) {
           setState(() {
             _dragX = (_dragX! + details.delta.dx);
             _dragY = (_dragY! + details.delta.dy);
           });
         } : null,
-        onPanEnd: widget.isEditMode ? (details) {
-          // Snap and save
-          final newX = _snap(_dragX!);
-          final newY = _snap(_dragY!);
-          
-          setState(() {
-            _dragX = null;
-            _dragY = null;
-          });
-
-          if (newX != bed.x || newY != bed.y) {
-            ref.read(gardenControllerProvider.notifier).updateBed(
-              bed.copyWith(x: newX, y: newY)
-            );
-          }
-        } : null,
+        onPanEnd: widget.isEditMode ? (details) => _endDrag() : null,
         child: Container(
           decoration: BoxDecoration(
-            color: (bed.color != null ? Color(bed.color!) : AppColors.primaryPurple).withOpacity(0.8),
+            color: bedColor.withOpacity(0.9), // Slightly higher opacity for better color visibility
             border: Border.all(
-              color: widget.isEditMode ? Colors.yellow : Colors.white,
+              color: borderColor,
               width: 2,
             ),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               // Content
               Center(
@@ -102,61 +125,127 @@ class _GardenBedWidgetState extends ConsumerState<GardenBedWidget> {
                   children: [
                     Text(
                       bed.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (bed.crops.isNotEmpty)
                       Text(
                         "${bed.crops.length} planter",
-                        style: const TextStyle(color: Colors.white70, fontSize: 10),
+                        style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 10),
                       ),
                   ],
                 ),
               ),
 
-              // Resize Handle (Bottom Right)
-              if (widget.isEditMode)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onPanStart: (details) {
-                       setState(() {
-                        _dragWidth = bed.width;
-                        _dragHeight = bed.height;
-                      });
-                    },
-                    onPanUpdate: (details) {
-                      setState(() {
-                        _dragWidth = (_dragWidth! + details.delta.dx).clamp(20.0, 500.0);
-                        _dragHeight = (_dragHeight! + details.delta.dy).clamp(20.0, 500.0);
-                      });
-                    },
-                    onPanEnd: (details) {
-                      final newW = _snap(_dragWidth!);
-                      final newH = _snap(_dragHeight!);
-                      
-                      setState(() {
-                        _dragWidth = null;
-                        _dragHeight = null;
-                      });
-
-                      if (newW != bed.width || newH != bed.height) {
-                         ref.read(gardenControllerProvider.notifier).updateBed(
-                          bed.copyWith(width: newW, height: newH)
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      color: Colors.yellow.withOpacity(0.5),
-                      child: const Icon(Icons.drag_handle, size: 12, color: Colors.black54),
-                    ),
-                  ),
+              if (widget.isEditMode) ...[
+                // Top Left
+                _buildHandle(
+                  top: -10, left: -10,
+                  icon: Icons.north_west,
+                  onUpdate: (delta) {
+                    final newW = (_dragWidth! - delta.dx);
+                    final newH = (_dragHeight! - delta.dy);
+                    if (newW >= _minSize && newW <= _maxSize) {
+                      _dragX = _dragX! + delta.dx;
+                      _dragWidth = newW;
+                    }
+                    if (newH >= _minSize && newH <= _maxSize) {
+                      _dragY = _dragY! + delta.dy;
+                      _dragHeight = newH;
+                    }
+                  },
                 ),
+                // Top Right
+                _buildHandle(
+                  top: -10, right: -10,
+                  icon: Icons.north_east,
+                  onUpdate: (delta) {
+                    final newW = (_dragWidth! + delta.dx);
+                    final newH = (_dragHeight! - delta.dy);
+                    if (newW >= _minSize && newW <= _maxSize) {
+                      _dragWidth = newW;
+                    }
+                    if (newH >= _minSize && newH <= _maxSize) {
+                      _dragY = _dragY! + delta.dy;
+                      _dragHeight = newH;
+                    }
+                  },
+                ),
+                // Bottom Left
+                _buildHandle(
+                  bottom: -10, left: -10,
+                  icon: Icons.south_west,
+                  onUpdate: (delta) {
+                    final newW = (_dragWidth! - delta.dx);
+                    final newH = (_dragHeight! + delta.dy);
+                    if (newW >= _minSize && newW <= _maxSize) {
+                      _dragX = _dragX! + delta.dx;
+                      _dragWidth = newW;
+                    }
+                    if (newH >= _minSize && newH <= _maxSize) {
+                      _dragHeight = newH;
+                    }
+                  },
+                ),
+                // Bottom Right
+                _buildHandle(
+                  bottom: -10, right: -10,
+                  icon: Icons.south_east,
+                  onUpdate: (delta) {
+                    final newW = (_dragWidth! + delta.dx);
+                    final newH = (_dragHeight! + delta.dy);
+                    if (newW >= _minSize && newW <= _maxSize) {
+                      _dragWidth = newW;
+                    }
+                    if (newH >= _minSize && newH <= _maxSize) {
+                      _dragHeight = newH;
+                    }
+                  },
+                ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHandle({
+    double? top,
+    double? bottom,
+    double? left,
+    double? right,
+    required IconData icon,
+    required Function(Offset) onUpdate,
+  }) {
+    return Positioned(
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
+      child: GestureDetector(
+        onPanStart: (details) => _initDrag(),
+        onPanUpdate: (details) {
+          setState(() {
+            onUpdate(details.delta);
+          });
+        },
+        onPanEnd: (details) => _endDrag(),
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.yellow,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.black12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 2,
+              )
+            ],
+          ),
+          child: Icon(icon, size: 16, color: Colors.black87),
         ),
       ),
     );

@@ -17,44 +17,137 @@ class FreezerTab extends ConsumerWidget {
     final itemsAsync = ref.watch(freezerItemsProvider);
 
     return itemsAsync.when(
-      data: (items) => items.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      data: (items) {
+        final totalQuantity = items.fold(0.0, (sum, item) => sum + item.quantity);
+        final activeItemsCount = items.where((item) => item.quantity > 0).length;
+        
+        final formattedTotal = totalQuantity.toStringAsFixed(
+            totalQuantity.truncateToDouble() == totalQuantity ? 0 : 1);
+
+        return Column(
+          children: [
+            // Stats Header
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              color: AppColors.white,
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.kitchen,
-                    size: 64,
-                    color: AppColors.lightGray,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Ingen varer i fryseren',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.gray,
+                  Expanded(
+                    child: _StatCard(
+                      label: 'Total mængde',
+                      value: formattedTotal,
+                      icon: Icons.scale,
+                      color: AppColors.primaryPurple,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Tryk + for at tilføje en vare',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.gray,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: _StatCard(
+                      label: 'Varer på lager',
+                      value: activeItemsCount.toString(),
+                      icon: Icons.inventory_2,
+                      color: AppColors.accentGreen,
                     ),
                   ),
                 ],
               ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _FreezerItemCard(item: item);
-              },
             ),
+            const Divider(height: 1),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.kitchen,
+                            size: 64,
+                            color: AppColors.lightGray,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'Ingen varer i fryseren',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.gray,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Tryk + for at tilføje en vare',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.gray,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _FreezerItemCard(item: item);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Fejl: $e')),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

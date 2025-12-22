@@ -337,7 +337,7 @@ class GroupedShoppingItems {
     final items = storeId == null ? noStore : (byStoreId[storeId] ?? []);
     return items
         .where((item) => item.active)
-        .fold(0.0, (sum, item) => sum + (item.price ?? 0.0));
+        .fold(0.0, (sum, item) => sum + ((item.price ?? 0.0) * item.displayAmount));
   }
 
   /// Calculate total price for completed items in a store
@@ -345,7 +345,7 @@ class GroupedShoppingItems {
     final items = storeId == null ? noStore : (byStoreId[storeId] ?? []);
     return items
         .where((item) => !item.active)
-        .fold(0.0, (sum, item) => sum + (item.price ?? 0.0));
+        .fold(0.0, (sum, item) => sum + ((item.price ?? 0.0) * item.displayAmount));
   }
 
   /// Get completed item count for a specific store
