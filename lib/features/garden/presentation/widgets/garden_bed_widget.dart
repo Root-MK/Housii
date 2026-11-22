@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/garden_bed_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../providers/garden_providers.dart';
-import 'bed_details_sheet.dart';
+import 'bed_popover_dialog.dart';
 
 class GardenBedWidget extends ConsumerStatefulWidget {
   final GardenBed bed;
@@ -252,11 +252,9 @@ class _GardenBedWidgetState extends ConsumerState<GardenBedWidget> {
   }
 
   void _showDetails(BuildContext context) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => BedDetailsSheet(bed: widget.bed),
+      builder: (context) => BedPopoverDialog(bed: widget.bed),
     );
   }
 }

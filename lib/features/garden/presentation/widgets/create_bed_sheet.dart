@@ -19,6 +19,13 @@ class _CreateBedSheetState extends ConsumerState<CreateBedSheet> {
   static const double _minSize = 20.0;
   static const double _maxSize = 1000.0; // 10 meters
 
+  String? _selectedIcon;
+
+  static const List<String> _gardenIcons = [
+    '🥕', '🥔', '🍅', '🌽', '🥬', '🧅', '🧄', '🥦', '🥒', '🌶️', 
+    '🍓', '🌻', '🌾', '🌿', '🍎', '🍐', '🍒', '🍇', '🍆', '🥜'
+  ];
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -84,6 +91,48 @@ class _CreateBedSheetState extends ConsumerState<CreateBedSheet> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Vælg ikon (valgfrit)',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 60,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _gardenIcons.length,
+              itemBuilder: (context, index) {
+                final icon = _gardenIcons[index];
+                final isSelected = _selectedIcon == icon;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedIcon = isSelected ? null : icon;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2) : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        icon,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
@@ -107,6 +156,7 @@ class _CreateBedSheetState extends ConsumerState<CreateBedSheet> {
                   height: height,
                   x: 500, // Default position in the canvas
                   y: 500,
+                  icon: _selectedIcon,
                 );
                 Navigator.pop(context);
               }

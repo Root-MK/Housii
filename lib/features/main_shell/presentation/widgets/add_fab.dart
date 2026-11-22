@@ -6,10 +6,14 @@ import '../../../../core/theme/app_shadows.dart';
 /// Floating action button for adding items
 class AddFab extends StatelessWidget {
   final VoidCallback onPressed;
+  final IconData icon;
+  final Color? backgroundColor;
 
   const AddFab({
     super.key,
     required this.onPressed,
+    this.icon = Icons.add,
+    this.backgroundColor,
   });
 
   @override
@@ -18,7 +22,8 @@ class AddFab extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: backgroundColor == null ? AppColors.primaryGradient : null,
+        color: backgroundColor,
         shape: BoxShape.circle,
         boxShadow: AppShadows.purpleGlow,
       ),
@@ -27,9 +32,9 @@ class AddFab extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(28),
-          child: const Center(
+          child: Center(
             child: Icon(
-              Icons.add,
+              icon,
               color: AppColors.white,
               size: 28,
             ),
@@ -46,3 +51,4 @@ class AddFab extends StatelessWidget {
         );
   }
 }
+

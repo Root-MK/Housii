@@ -7,6 +7,12 @@ import '../providers/garden_providers.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'bed_form_sheet.dart';
+import '../../data/water_index_service.dart';
+import '../../data/models/water_index_config.dart';
+import '../../../../shared/providers/home_provider.dart';
+import 'water_status_widget.dart';
+import 'watering_form_sheet.dart';
+import 'water_history_chart.dart';
 
 class BedDetailsSheet extends ConsumerStatefulWidget {
   final GardenBed bed;
@@ -22,9 +28,43 @@ class BedDetailsSheet extends ConsumerStatefulWidget {
 
 class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
   final _dateFormat = DateFormat('d. MMMM yyyy', 'da_DK');
+  BedWaterStatus? _waterStatus;
+  bool _isLoadingWaterStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaterStatus();
+  }
+
+  Future<void> _loadWaterStatus() async {
+    try {
+      final home = ref.read(currentHomeProvider).value;
+      if (home != null) {
+        final service = ref.read(waterIndexServiceProvider);
+        final status = await service.calculateBedWaterStatus(home.id, widget.bed.id);
+        if (mounted) {
+          setState(() {
+            _waterStatus = status;
+            _isLoadingWaterStatus = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading water status: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingWaterStatus = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final configAsync = ref.watch(waterIndexConfigProvider);
+    final config = configAsync.value ?? const WaterIndexConfig();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.lg),
       height: MediaQuery.of(context).size.height * 0.85,
@@ -41,6 +81,10 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
               Expanded(
                 child: Row(
                   children: [
+                    if (widget.bed.icon != null) ...[
+                      Text(widget.bed.icon!, style: const TextStyle(fontSize: 32)),
+                      const SizedBox(width: 8),
+                    ],
                     Flexible(
                       child: Text(
                         widget.bed.name,
@@ -77,6 +121,89 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
             '${widget.bed.width.toInt()} x ${widget.bed.height.toInt()} cm',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.gray),
           ),
+          
+          if (_waterStatus != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            WaterStatusWidget(
+              status: _waterStatus!,
+              config: config,
+              service: ref.read(waterIndexServiceProvider),
+              bedWidthCm: widget.bed.width,
+              bedHeightCm: widget.bed.height,
+              compact: false,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                FilledButton.icon(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (context) => WateringFormSheet(bed: widget.bed),
+                    ).then((_) => _loadWaterStatus());
+                  },
+                  icon: const Icon(Icons.water_drop),
+                  label: const Text('Registrer vanding'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      builder: (context) => DraggableScrollableSheet(
+                        initialChildSize: 0.6,
+                        minChildSize: 0.4,
+                        maxChildSize: 0.9,
+                        expand: false,
+                        builder: (context, scrollController) => Column(
+                          children: [
+                            const SizedBox(height: 16),
+                            Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Vandbalance Historik',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Viser vandunderskud over tid (mm)',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                controller: scrollController,
+                                child: WaterHistoryChart(
+                                  homeId: ref.read(currentHomeProvider).value!.id,
+                                  bedId: widget.bed.id,
+                                  wateringThreshold: config.wateringThreshold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.show_chart),
+                  label: const Text('Historik'),
+                ),
+              ],
+            ),
+          ],
+
           const Divider(height: 32),
           
           Row(
@@ -105,6 +232,7 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
                       final crop = widget.bed.crops[index];
                       return _CropCard(
                         crop: crop,
+                        bed: widget.bed,
                         onEdit: () => _editCrop(context, crop),
                         onDelete: () => ref.read(gardenControllerProvider.notifier).removeCrop(widget.bed, crop.id),
                         onAction: (action) => _handleCropAction(crop, action),
@@ -160,10 +288,11 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
       context: context,
       isScrollControlled: true,
       builder: (context) => _EditCropSheet(
-        onSave: (name, variety, notes, plantDate) {
+        onSave: (name, variety, quantity, notes, plantDate) {
           final crop = GardenCrop.create(
             name: name,
             variety: variety,
+            quantity: quantity,
             notes: notes,
             plantDate: plantDate,
           );
@@ -179,10 +308,11 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
       isScrollControlled: true,
       builder: (context) => _EditCropSheet(
         crop: crop,
-        onSave: (name, variety, notes, plantDate) {
+        onSave: (name, variety, quantity, notes, plantDate) {
           final updated = crop.copyWith(
             name: name,
             variety: variety,
+            quantity: quantity,
             notes: notes,
             plantDate: plantDate,
           );
@@ -193,7 +323,7 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
   }
 
   Future<void> _handleCropAction(GardenCrop crop, String action) async {
-    final title = action == 'water' ? 'Registrer vanding' : 'Registrer gødning';
+    final title = 'Registrer gødning';
     final now = DateTime.now();
     DateTime selectedDate = now;
 
@@ -236,12 +366,7 @@ class _BedDetailsSheetState extends ConsumerState<BedDetailsSheet> {
     );
 
     if (confirm == true) {
-      GardenCrop updated;
-      if (action == 'water') {
-        updated = crop.copyWith(lastWatered: selectedDate);
-      } else {
-        updated = crop.copyWith(lastFertilized: selectedDate);
-      }
+      final updated = crop.copyWith(lastFertilized: selectedDate);
       ref.read(gardenControllerProvider.notifier).updateCrop(widget.bed, updated);
     }
   }
@@ -252,6 +377,7 @@ class _CropCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final Function(String) onAction;
+  final GardenBed bed;
   final DateFormat dateFormat;
 
   const _CropCard({
@@ -259,6 +385,7 @@ class _CropCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onAction,
+    required this.bed,
     required this.dateFormat,
   });
 
@@ -277,7 +404,10 @@ class _CropCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(crop.name, style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        crop.quantity > 1 ? '${crop.quantity}x ${crop.name}' : crop.name,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       if (crop.variety != null && crop.variety!.isNotEmpty)
                         Text(crop.variety!, style: Theme.of(context).textTheme.bodySmall),
                     ],
@@ -298,14 +428,6 @@ class _CropCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => onAction('water'),
-                    icon: const Icon(Icons.water_drop, size: 16),
-                    label: const Text('Vand'),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => onAction('fertilize'),
@@ -344,7 +466,7 @@ class _InfoRow extends StatelessWidget {
 
 class _EditCropSheet extends StatefulWidget {
   final GardenCrop? crop;
-  final Function(String name, String variety, String notes, DateTime plantDate) onSave;
+  final Function(String name, String variety, int quantity, String notes, DateTime plantDate) onSave;
 
   const _EditCropSheet({this.crop, required this.onSave});
 
@@ -355,6 +477,7 @@ class _EditCropSheet extends StatefulWidget {
 class _EditCropSheetState extends State<_EditCropSheet> {
   late TextEditingController _nameController;
   late TextEditingController _varietyController;
+  late TextEditingController _quantityController;
   late TextEditingController _notesController;
   late DateTime _plantDate;
   final _dateFormat = DateFormat('d. MMMM yyyy', 'da_DK');
@@ -364,6 +487,7 @@ class _EditCropSheetState extends State<_EditCropSheet> {
     super.initState();
     _nameController = TextEditingController(text: widget.crop?.name);
     _varietyController = TextEditingController(text: widget.crop?.variety);
+    _quantityController = TextEditingController(text: (widget.crop?.quantity ?? 1).toString());
     _notesController = TextEditingController(text: widget.crop?.notes);
     _plantDate = widget.crop?.plantDate ?? DateTime.now();
   }
@@ -372,6 +496,7 @@ class _EditCropSheetState extends State<_EditCropSheet> {
   void dispose() {
     _nameController.dispose();
     _varietyController.dispose();
+    _quantityController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -421,6 +546,12 @@ class _EditCropSheetState extends State<_EditCropSheet> {
             decoration: const InputDecoration(labelText: 'Sort (f.eks. Nantes 2)', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 16),
+          TextField(
+            controller: _quantityController,
+            decoration: const InputDecoration(labelText: 'Antal', border: OutlineInputBorder()),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
           ListTile(
             title: const Text('Plantet dato'),
             subtitle: Text(_dateFormat.format(_plantDate)),
@@ -441,7 +572,8 @@ class _EditCropSheetState extends State<_EditCropSheet> {
           ElevatedButton(
             onPressed: () {
               if (_nameController.text.isNotEmpty) {
-                widget.onSave(_nameController.text, _varietyController.text, _notesController.text, _plantDate);
+                final quantity = int.tryParse(_quantityController.text) ?? 1;
+                widget.onSave(_nameController.text, _varietyController.text, quantity, _notesController.text, _plantDate);
                 Navigator.pop(context);
               }
             },

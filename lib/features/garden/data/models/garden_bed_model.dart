@@ -10,6 +10,7 @@ class GardenBed {
   final double width; // width in cm
   final double height; // height in cm
   final int? color; // Color value (int)
+  final String? icon; // Icon for the bed (emoji or identifier)
   final String homeId;
   final DateTime createdAt;
   final List<GardenCrop> crops;
@@ -22,6 +23,7 @@ class GardenBed {
     required this.width,
     required this.height,
     this.color,
+    this.icon,
     required this.homeId,
     required this.createdAt,
     required this.crops,
@@ -35,6 +37,7 @@ class GardenBed {
     double width = 100, // Default 100cm
     double height = 100, // Default 100cm
     int? color,
+    String? icon,
   }) {
     return GardenBed(
       id: const Uuid().v4(),
@@ -44,6 +47,7 @@ class GardenBed {
       width: width,
       height: height,
       color: color,
+      icon: icon,
       homeId: homeId,
       createdAt: DateTime.now(),
       crops: [],
@@ -60,6 +64,7 @@ class GardenBed {
       width: (data['width'] as num?)?.toDouble() ?? 100.0,
       height: (data['height'] as num?)?.toDouble() ?? 100.0,
       color: data['color'] as int?,
+      icon: data['icon'] as String?,
       homeId: data['homeId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       crops: (data['crops'] as List<dynamic>?)
@@ -77,6 +82,7 @@ class GardenBed {
       'width': width,
       'height': height,
       'color': color,
+      'icon': icon,
       'homeId': homeId,
       'createdAt': Timestamp.fromDate(createdAt),
       'crops': crops.map((c) => c.toMap()).toList(),
@@ -90,6 +96,7 @@ class GardenBed {
     double? width,
     double? height,
     int? color,
+    String? icon,
     List<GardenCrop>? crops,
   }) {
     return GardenBed(
@@ -100,6 +107,7 @@ class GardenBed {
       width: width ?? this.width,
       height: height ?? this.height,
       color: color ?? this.color,
+      icon: icon ?? this.icon,
       homeId: homeId,
       createdAt: createdAt,
       crops: crops ?? this.crops,

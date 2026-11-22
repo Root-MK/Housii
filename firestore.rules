@@ -172,6 +172,29 @@ service cloud.firestore {
       match /garden/{plantId} {
         allow read, write: if isHomeMember(homeId);
       }
+      
+      // Garden harvests subcollection
+      match /gardenHarvests/{harvestId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Watering logs subcollection
+      match /wateringLogs/{logId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+      
+      // Settings subcollection
+      match /settings/{settingId} {
+        allow read, write: if isHomeMember(homeId);
+      }
+    }
+    
+    // Global weather data - shared across all users (location-specific)
+    match /weatherData/{dateKey} {
+      // Any authenticated admin-approved user can read
+      allow read: if isAdminApproved();
+      // Any authenticated admin-approved user can write (first to fetch caches for all)
+      allow write: if isAdminApproved();
     }
     
     // User-specific list ordering

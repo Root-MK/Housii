@@ -140,4 +140,20 @@ class ShoppingService {
     });
     debugPrint('✅ Item store updated to: $newStoreId');
   }
+
+  /// Get completed items for today
+  Future<List<ShoppingItem>> getCompletedItemsForToday(String homeId) async {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    
+    final snapshot = await _shoppingCollection(homeId)
+        .where('active', isEqualTo: false)
+        .where('updatedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+        .orderBy('updatedAt', descending: true)
+        .get();
+        
+    return snapshot.docs
+        .map((doc) => ShoppingItem.fromFirestore(doc))
+        .toList();
+  }
 }

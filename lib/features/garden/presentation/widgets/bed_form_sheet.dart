@@ -36,6 +36,13 @@ class _BedFormSheetState extends ConsumerState<BedFormSheet> {
     Color(0xFF2196F3), // Blue
   ];
 
+  String? _selectedIcon;
+
+  static const List<String> _gardenIcons = [
+    '🥕', '🥔', '🍅', '🌽', '🥬', '🧅', '🧄', '🥦', '🥒', '🌶️', 
+    '🍓', '🌻', '🌾', '🌿', '🍎', '🍐', '🍒', '🍇', '🍆', '🥜'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +50,7 @@ class _BedFormSheetState extends ConsumerState<BedFormSheet> {
     _widthController = TextEditingController(text: widget.bed?.width.toInt().toString() ?? '120');
     _heightController = TextEditingController(text: widget.bed?.height.toInt().toString() ?? '120');
     _selectedColor = widget.bed?.color ?? AppColors.primaryPurple.value;
+    _selectedIcon = widget.bed?.icon;
   }
 
   @override
@@ -153,6 +161,48 @@ class _BedFormSheetState extends ConsumerState<BedFormSheet> {
               },
             ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Vælg ikon (valgfrit)',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 60,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _gardenIcons.length,
+              itemBuilder: (context, index) {
+                final icon = _gardenIcons[index];
+                final isSelected = _selectedIcon == icon;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedIcon = isSelected ? null : icon;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2) : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        icon,
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
@@ -177,6 +227,7 @@ class _BedFormSheetState extends ConsumerState<BedFormSheet> {
                       width: width,
                       height: height,
                       color: _selectedColor,
+                      icon: _selectedIcon,
                     ),
                   );
                 } else {
@@ -189,6 +240,7 @@ class _BedFormSheetState extends ConsumerState<BedFormSheet> {
                     x: 500, // Default position in the canvas
                     y: 500,
                     color: _selectedColor,
+                    icon: _selectedIcon,
                   );
                 }
                 Navigator.pop(context);

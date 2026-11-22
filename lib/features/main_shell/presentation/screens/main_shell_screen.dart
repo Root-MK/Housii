@@ -10,6 +10,7 @@ import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/home_provider.dart';
 import '../../../shopping/presentation/widgets/add_shopping_item_sheet.dart';
 import '../../../shopping/presentation/widgets/manage_stores_sheet.dart';
+import '../../../shopping/presentation/widgets/receipt_sheet.dart';
 import '../../../lists/presentation/widgets/add_list_sheet.dart';
 import '../../../lists/presentation/widgets/add_list_item_sheet.dart';
 import '../../../lists/presentation/widgets/archive_sheet.dart';
@@ -17,6 +18,10 @@ import '../../../lists/presentation/widgets/list_management_sheet.dart';
 import '../../../lists/presentation/providers/lists_providers.dart';
 import '../../../food/presentation/providers/food_providers.dart';
 import '../../../food/presentation/screens/food_screen.dart';
+import '../../../garden/presentation/providers/garden_view_provider.dart';
+import '../../../garden/presentation/widgets/bed_form_sheet.dart';
+import '../../../garden/presentation/widgets/garden_settings_sheet.dart';
+import '../../../garden/data/garden_service.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/add_fab.dart';
 
@@ -123,6 +128,37 @@ class MainShellScreen extends ConsumerWidget {
         const SnackBar(content: Text('Indlæser... Prøv igen.')),
       );
       return;
+    }
+
+    // For garden module, control edit mode
+    if (currentIndex == 3) {
+      debugPrint('🌱 Garden FAB pressed');
+      final gardenViewState = ref.read(gardenViewProvider);
+      final beds = ref.read(gardenBedsProvider).valueOrNull ?? [];
+      
+      // If in Visual tab:
+      if (gardenViewState.tabIndex == 1) {
+        if (beds.isEmpty) {
+          // Empty: show add bed sheet
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => const BedFormSheet(),
+          );
+        } else {
+          // Toggle edit mode
+          ref.read(gardenViewProvider.notifier).toggleEditMode();
+        }
+        return;
+      } else {
+        // In List tab - show coming soon or add bed
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) => const BedFormSheet(),
+        );
+        return;
+      }
     }
 
     // For other modules, show placeholder
@@ -301,12 +337,24 @@ class MainShellScreen extends ConsumerWidget {
         ),
         actions: [
           // Store management - only show on shopping screen
-          if (currentIndex == 0)
+          if (currentIndex == 0) ...[
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'Dagens kvittering',
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                useRootNavigator: true,
+                builder: (context) => const ReceiptSheet(),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.store_outlined),
               tooltip: 'Administrer butikker',
               onPressed: () => showManageStoresSheet(context),
             ),
+          ],
           // Lists management - only show on lists screen
           if (currentIndex == 1) ...[
             IconButton(
@@ -332,21 +380,68 @@ class MainShellScreen extends ConsumerWidget {
               ),
             ),
           ],
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => context.push(AppRoutes.homeSettings),
-          ),
+          // Garden-specific buttons
+          if (currentIndex == 3) ...[
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                builder: (context) => const GardenSettingsSheet(),
+              ),
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => context.push(AppRoutes.homeSettings),
+            ),
+          ],
         ],
       ),
       body: child,
-      floatingActionButton: AddFab(
-        onPressed: () => _onAddPressed(context, ref),
-      ),
+      floatingActionButton: _buildFab(context, ref, currentIndex),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomNavBar(
         currentIndex: currentIndex,
         onTap: (index) => _onItemTapped(context, index),
       ),
+    );
+  }
+
+  Widget _buildFab(BuildContext context, WidgetRef ref, int currentIndex) {
+    // Garden-specific FAB logic
+    if (currentIndex == 3) {
+      final gardenViewState = ref.watch(gardenViewProvider);
+      final beds = ref.watch(gardenBedsProvider).valueOrNull ?? [];
+
+      // Only show special icons in Visual tab
+      if (gardenViewState.tabIndex == 1) {
+        if (beds.isEmpty) {
+          // Empty: show Add icon
+          return AddFab(
+            onPressed: () => _onAddPressed(context, ref),
+            icon: Icons.add,
+          );
+        } else if (gardenViewState.isEditMode) {
+          // Edit mode: show Check icon with green background
+          return AddFab(
+            onPressed: () => _onAddPressed(context, ref),
+            icon: Icons.check,
+            backgroundColor: Colors.green,
+          );
+        } else {
+          // Normal mode: show Edit icon
+          return AddFab(
+            onPressed: () => _onAddPressed(context, ref),
+            icon: Icons.edit,
+          );
+        }
+      }
+    }
+
+    // Default: show Add icon
+    return AddFab(
+      onPressed: () => _onAddPressed(context, ref),
     );
   }
 }

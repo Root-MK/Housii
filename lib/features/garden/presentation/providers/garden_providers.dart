@@ -21,6 +21,7 @@ class GardenController extends _$GardenController {
     double width = 100,
     double height = 100,
     int? color,
+    String? icon,
   }) async {
     final service = ref.read(gardenServiceProvider);
     final bed = GardenBed.create(
@@ -31,6 +32,7 @@ class GardenController extends _$GardenController {
       width: width,
       height: height,
       color: color,
+      icon: icon,
     );
     await service.addBed(bed);
   }

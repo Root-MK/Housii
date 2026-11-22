@@ -25,6 +25,19 @@ class GardenListTab extends ConsumerWidget {
             return Card(
               margin: const EdgeInsets.only(bottom: AppSpacing.md),
               child: ListTile(
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    bed.icon ?? '🌱',
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                ),
                 title: Text(bed.name),
                 subtitle: Text('${bed.crops.length} planter • ${bed.width.toInt()}x${bed.height.toInt()} cm'),
                 trailing: const Icon(Icons.chevron_right),
